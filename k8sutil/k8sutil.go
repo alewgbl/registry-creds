@@ -1,7 +1,6 @@
 package k8sutil
 
 import (
-	"log"
 	"time"
 
 	"github.com/Sirupsen/logrus"
@@ -22,57 +21,55 @@ type KubeInterface interface {
 	Core() coreType.CoreV1Interface
 }
 
-type K8sutilInterface struct {
+// UtilInterface is the struct behind
+type UtilInterface struct {
 	Kclient    KubeInterface
 	MasterHost string
+	Log        logrus.FieldLogger
 }
 
 // New creates a new instance of k8sutil
-func New(kubeCfgFile, masterHost string) (*K8sutilInterface, error) {
-
+func New(kubeCfgFile, masterHost string) (*UtilInterface, error) {
+	log := logrus.WithField("function", "newKubeClient")
 	client, err := newKubeClient(kubeCfgFile)
-
 	if err != nil {
-		logrus.Fatalf("Could not init Kubernetes client! [%s]", err)
+		log.Fatalf("Could not init Kubernetes client! [%s]", err)
 	}
 
-	k := &K8sutilInterface{
+	k := &UtilInterface{
 		Kclient:    client,
 		MasterHost: masterHost,
+		Log:        logrus.WithField("struct", "UtilInterface"),
 	}
 
 	return k, nil
 }
 
+// newKubeClient creates a new instance of the kubernetes API client
 func newKubeClient(kubeCfgFile string) (KubeInterface, error) {
-
+	log := logrus.WithField("function", "newKubeClient")
 	var client *kubernetes.Clientset
-
 	// Should we use in cluster or out of cluster config
 	if len(kubeCfgFile) == 0 {
-		logrus.Info("Using InCluster k8s config")
+		log.Info("Using InCluster k8s config")
 		cfg, err := rest.InClusterConfig()
-
 		if err != nil {
 			return nil, err
 		}
 
 		client, err = kubernetes.NewForConfig(cfg)
-
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		logrus.Infof("Using OutOfCluster k8s config with kubeConfigFile: %s", kubeCfgFile)
+		log.Infof("Using OutOfCluster k8s config with kubeConfigFile: %s", kubeCfgFile)
 		cfg, err := clientcmd.BuildConfigFromFlags("", kubeCfgFile)
-
 		if err != nil {
-			logrus.Error("Got error trying to create client: ", err)
+			log.Error("Got error trying to create client: ", err)
 			return nil, err
 		}
 
 		client, err = kubernetes.NewForConfig(cfg)
-
 		if err != nil {
 			return nil, err
 		}
@@ -82,10 +79,11 @@ func newKubeClient(kubeCfgFile string) (KubeInterface, error) {
 }
 
 // GetNamespaces returns all namespaces
-func (k *K8sutilInterface) GetNamespaces() (*v1.NamespaceList, error) {
+func (k *UtilInterface) GetNamespaces() (*v1.NamespaceList, error) {
+	log := k.Log.WithField("function", "GetNamespaces")
 	namespaces, err := k.Kclient.Namespaces().List(v1.ListOptions{})
 	if err != nil {
-		logrus.Error("Error getting namespaces: ", err)
+		log.Error("Error getting namespaces: ", err)
 		return nil, err
 	}
 
@@ -93,10 +91,11 @@ func (k *K8sutilInterface) GetNamespaces() (*v1.NamespaceList, error) {
 }
 
 // GetSecret get a secret
-func (k *K8sutilInterface) GetSecret(namespace, secretname string) (*v1.Secret, error) {
+func (k *UtilInterface) GetSecret(namespace, secretname string) (*v1.Secret, error) {
+	log := k.Log.WithField("function", "GetSecret")
 	secret, err := k.Kclient.Secrets(namespace).Get(secretname)
 	if err != nil {
-		logrus.Error("Error getting secret: ", err)
+		log.Error("Error getting secret: ", err)
 		return nil, err
 	}
 
@@ -104,11 +103,11 @@ func (k *K8sutilInterface) GetSecret(namespace, secretname string) (*v1.Secret, 
 }
 
 // CreateSecret creates a secret
-func (k *K8sutilInterface) CreateSecret(namespace string, secret *v1.Secret) error {
+func (k *UtilInterface) CreateSecret(namespace string, secret *v1.Secret) error {
+	log := k.Log.WithField("function", "CreateSecret")
 	_, err := k.Kclient.Secrets(namespace).Create(secret)
-
 	if err != nil {
-		logrus.Error("Error creating secret: ", err)
+		log.Error("Error creating secret: ", err)
 		return err
 	}
 
@@ -116,11 +115,11 @@ func (k *K8sutilInterface) CreateSecret(namespace string, secret *v1.Secret) err
 }
 
 // UpdateSecret updates a secret
-func (k *K8sutilInterface) UpdateSecret(namespace string, secret *v1.Secret) error {
+func (k *UtilInterface) UpdateSecret(namespace string, secret *v1.Secret) error {
+	log := k.Log.WithField("function", "UpdateSecret")
 	_, err := k.Kclient.Secrets(namespace).Update(secret)
-
 	if err != nil {
-		logrus.Error("Error updating secret: ", err)
+		log.Error("Error updating secret: ", err)
 		return err
 	}
 
@@ -128,11 +127,11 @@ func (k *K8sutilInterface) UpdateSecret(namespace string, secret *v1.Secret) err
 }
 
 // GetServiceAccount updates a secret
-func (k *K8sutilInterface) GetServiceAccount(namespace, name string) (*v1.ServiceAccount, error) {
+func (k *UtilInterface) GetServiceAccount(namespace, name string) (*v1.ServiceAccount, error) {
+	log := k.Log.WithField("function", "GetServiceAccount")
 	sa, err := k.Kclient.ServiceAccounts(namespace).Get(name)
-
 	if err != nil {
-		logrus.Error("Error getting service account: ", err)
+		log.Error("Error getting service account: ", err)
 		return nil, err
 	}
 
@@ -140,18 +139,18 @@ func (k *K8sutilInterface) GetServiceAccount(namespace, name string) (*v1.Servic
 }
 
 // UpdateServiceAccount updates a secret
-func (k *K8sutilInterface) UpdateServiceAccount(namespace string, sa *v1.ServiceAccount) error {
+func (k *UtilInterface) UpdateServiceAccount(namespace string, sa *v1.ServiceAccount) error {
+	log := k.Log.WithField("function", "UpdateServiceAccount")
 	_, err := k.Kclient.ServiceAccounts(namespace).Update(sa)
-
 	if err != nil {
-		logrus.Error("Error updating service account: ", err)
+		log.Error("Error updating service account: ", err)
 		return err
 	}
 
 	return nil
 }
 
-func (k *K8sutilInterface) WatchNamespaces(resyncPeriod time.Duration, handler func(*v1.Namespace) error) {
+func (k *UtilInterface) WatchNamespaces(resyncPeriod time.Duration, handler func(*v1.Namespace) error) {
 	stopC := make(chan struct{})
 	_, c := cache.NewInformer(
 		cache.NewListWatchFromClient(k.Kclient.Core().RESTClient(), "namespaces", v1.NamespaceAll, fields.Everything()),
@@ -160,12 +159,14 @@ func (k *K8sutilInterface) WatchNamespaces(resyncPeriod time.Duration, handler f
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				if err := handler(obj.(*v1.Namespace)); err != nil {
-					log.Println(err)
+					logrus.WithField("function", "AddFunc").
+						Errorf("error handling add request: %s", err.Error())
 				}
 			},
 			UpdateFunc: func(_ interface{}, obj interface{}) {
 				if err := handler(obj.(*v1.Namespace)); err != nil {
-					log.Println(err)
+					logrus.WithField("function", "UpdateFunc").
+						Errorf("error handling update request: %s", err.Error())
 				}
 			},
 		},

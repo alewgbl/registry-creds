@@ -10,10 +10,10 @@ import (
 	"testing"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/alewgbl/registry-creds/k8sutil"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ecr"
 	"github.com/stretchr/testify/assert"
-	"github.com/upmc-enterprises/registry-creds/k8sutil"
 	"golang.org/x/net/context"
 	"golang.org/x/oauth2"
 	coreType "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -23,19 +23,19 @@ import (
 	"k8s.io/client-go/pkg/watch"
 )
 
-func init() {
-	log.SetOutput(ioutil.Discard)
-	logrus.SetOutput(ioutil.Discard)
+func TestMain(m *testing.M) {
+	// logrus.SetOutput(ioutil.Discard)
+	os.Exit(m.Run())
 }
 
-func disableRetries() {
+/*func disableRetries() {
 	RetryCfg = RetryConfig{
 		Type:                "simple",
 		NumberOfRetries:     0,
 		RetryDelayInSeconds: 1,
 	}
 	SetupRetryTimer()
-}
+}*/
 
 func enableShortRetries() {
 	RetryCfg = RetryConfig{
@@ -276,10 +276,11 @@ func (f *fakeFailingACRClient) getAuthToken(registryURL, clientID, password stri
 	return AuthToken{}, errors.New("fake error")
 }
 
-func newKubeUtil() *k8sutil.K8sutilInterface {
-	return &k8sutil.K8sutilInterface{
+func newKubeUtil() *k8sutil.UtilInterface {
+	return &k8sutil.UtilInterface{
 		Kclient:    newFakeKubeClient(),
 		MasterHost: "foo",
+		Log:        logrus.WithField("struct", "UtilInterface"),
 	}
 }
 
@@ -391,7 +392,16 @@ func newFakeController() *controller {
 	gcrClient := newFakeGcrClient()
 	dprClient := newFakeDprClient()
 	acrClient := newFakeACRClient()
-	c := controller{util, ecrClient, gcrClient, dprClient, acrClient}
+	c := controller{
+		util,
+		ecrClient,
+		gcrClient,
+		dprClient,
+		acrClient,
+		logrus.WithField("struct", "controller"),
+		make([]SecretGenerator, 0),
+	}
+	c.createSecretGenerators()
 	return &c
 }
 
@@ -401,7 +411,16 @@ func newFakeFailingController() *controller {
 	gcrClient := newFakeFailingGcrClient()
 	dprClient := newFakeFailingDprClient()
 	acrClient := newFakeFailingACRClient()
-	c := controller{util, ecrClient, gcrClient, dprClient, acrClient}
+	c := controller{
+		util,
+		ecrClient,
+		gcrClient,
+		dprClient,
+		acrClient,
+		logrus.WithField("struct", "controller"),
+		make([]SecretGenerator, 0),
+	}
+	c.createSecretGenerators()
 	return &c
 }
 
@@ -584,9 +603,9 @@ func TestProcessWithExistingSecrets(t *testing.T) {
 // func TestProcessNoDefaultServiceAccount(t *testing.T) {
 // 	util := newKubeUtil()
 // 	ecrClient := newFakeEcrClient()
-// 	gcrClient := newFakeGcrClient()
+// 	gcrClientData := newFakeGcrClient()
 // 	testConfig := providerConfig{true, true}
-// 	c := &controller{util, ecrClient, gcrClient, testConfig}
+// 	c := &controller{util, ecrClient, gcrClientData, testConfig}
 
 // 	err := c.k8sutil.DeleteServiceAccounts("namespace1").Delete("default")
 // 	assert.Nil(t, err)
@@ -605,6 +624,7 @@ func TestProcessWithExistingImagePullSecrets(t *testing.T) {
 		assert.Nil(t, err)
 		serviceAccount.ImagePullSecrets = append(serviceAccount.ImagePullSecrets, v1.LocalObjectReference{Name: "someOtherSecret"})
 		err = c.k8sutil.UpdateServiceAccount(ns, serviceAccount)
+		assert.Nil(t, err)
 	}
 
 	process(t, c)

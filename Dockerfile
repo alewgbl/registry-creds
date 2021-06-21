@@ -1,9 +1,3 @@
-FROM alpine:3.4
-MAINTAINER Steve Sloka <steve@stevesloka.com>
-
-RUN apk add --update ca-certificates && \
-  rm -rf /var/cache/apk/*
-
+FROM gcr.io/distroless/base
 COPY registry-creds registry-creds
-
 ENTRYPOINT ["/registry-creds"]

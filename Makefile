@@ -1,9 +1,8 @@
-# Makefile for the Docker image upmcenterprises/registry-creds
-# MAINTAINER: Steve Sloka <steve@stevesloka.com>
+# Makefile for the Docker image github.com/alewgbl/registry-creds
 # If you update this image please bump the tag value before pushing.
 
-TAG = 1.10
-PREFIX = upmcenterprises
+TAG = 1.10.1
+PREFIX = alewgbl
 
 BIN = registry-creds
 
@@ -27,7 +26,8 @@ all: container
 
 .PHONY: build
 build: main.go
-	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -a -installsuffix cgo -o $(BIN) --ldflags '-w' $<
+	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o $(BIN) -ldflags '-s -w'
+	upx -q $(BIN)
 
 .PHONY: container
 container: build
@@ -46,3 +46,8 @@ clean:
 .PHONY: test
 test: clean
 	go test -v $(go list ./... | grep -v vendor)
+
+.PHONY: lint
+lint:
+	go vet ./...
+	golangci-lint run
